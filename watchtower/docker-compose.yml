@@ -1,16 +1,37 @@
 services:
+    socket-proxy:
+        image: tecnativa/docker-socket-proxy:latest
+        container_name: watchtower-socket-proxy
+        restart: unless-stopped
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+        environment:
+            # Minimal surface for watchtower: read containers/images + POST for update.
+            CONTAINERS: 1
+            IMAGES: 1
+            POST: 1
+        networks:
+            - socket-proxy
+
     watchtower:
         image: containrrr/watchtower:latest
-        volumes:
-            - /var/run/docker.sock:/var/run/docker.sock
-            - ~/.docker/config.json:/config.json:ro
-        command: --label-enable --cleanup --interval 30
+        container_name: watchtower
         restart: unless-stopped
+        depends_on:
+            - socket-proxy
+        volumes:
+            - ~/.docker/config.json:/config.json:ro
+        environment:
+            DOCKER_HOST: tcp://socket-proxy:2375
+        command: --label-enable --cleanup --interval 30
         networks:
+            - socket-proxy
             - watchtower
 
 networks:
+    socket-proxy:
+        driver: bridge
+        internal: true
     watchtower:
         external: true
         name: watchtower
- 
