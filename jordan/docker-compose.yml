@@ -6,7 +6,6 @@ services:
     networks:
       - traefik-proxy
       - watchtower
-    user: "root"
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
