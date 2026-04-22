@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     shm_size: "1g"
     ports:
-      - "11235:11235"
+      - "192.168.10.30:11235:11235"
     env_file:
       - .env
       - .llm.env

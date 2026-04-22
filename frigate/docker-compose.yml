@@ -29,10 +29,10 @@ services:
           size: 2000000000
     ports:
       - "8971:8971"
-      - "5000:5000" # Internal unauthenticated access. Expose carefully.
-      - "8554:8554" # RTSP feeds
-      - "8555:8555/tcp" # WebRTC over tcp
-      - "8555:8555/udp" # WebRTC over udp
+      - "192.168.10.30:5000:5000" # Internal unauthenticated — LAN only
+      - "192.168.10.30:8554:8554" # RTSP feeds — LAN only
+      - "192.168.10.30:8555:8555/tcp" # WebRTC — LAN only
+      - "192.168.10.30:8555:8555/udp" # WebRTC — LAN only
     environment:
       FRIGATE_RTSP_PASSWORD: "HCuzkVRGEe2j3PFyt6HjX4QmJjp5trWT"
     networks:

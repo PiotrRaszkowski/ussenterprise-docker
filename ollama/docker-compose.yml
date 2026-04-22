@@ -13,7 +13,7 @@ services:
               count: 0
               capabilities: [gpu]
     ports:
-      - "11434:11434"
+      - "192.168.10.30:11434:11434"
     environment:
       - OLLAMA_MAX_LOADED_MODELS=1
       - OLLAMA_NUM_PARALLEL=1

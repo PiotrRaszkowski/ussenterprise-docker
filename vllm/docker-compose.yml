@@ -3,7 +3,7 @@ services:
     image: vllm/vllm-openai:latest
     container_name: vllm-llama-31-8b-instruct
     ports:
-      - "11810:8000"
+      - "192.168.10.30:11810:8000"
     volumes:
       # Persistent volume for model cache (saves ~28GB download on restart)
       - vllm-models:/root/.cache/huggingface
