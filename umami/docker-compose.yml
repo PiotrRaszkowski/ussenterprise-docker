@@ -1,0 +1,46 @@
+services:
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    container_name: umami
+    restart: unless-stopped
+    networks:
+      - postgres
+      - traefik-proxy
+      - watchtower
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      - DATABASE_URL=postgresql://umami:${UMAMI_DB_PASSWORD}@postgres:5432/umami
+      - DATABASE_TYPE=postgresql
+      - APP_SECRET=${UMAMI_APP_SECRET}
+      - TZ=Europe/Warsaw
+    labels:
+      - "traefik.enable=true"
+      # HTTP -> HTTPS redirect
+      - "traefik.http.routers.umami.entrypoints=http"
+      - "traefik.http.routers.umami.rule=Host(`${UMAMI_DOMAIN}`)"
+      - "traefik.http.middlewares.umami-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.umami.middlewares=umami-https-redirect"
+      # HTTPS
+      - "traefik.http.routers.umami-secure.entrypoints=https"
+      - "traefik.http.routers.umami-secure.rule=Host(`${UMAMI_DOMAIN}`)"
+      - "traefik.http.routers.umami-secure.tls=true"
+      - "traefik.http.routers.umami-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.umami-secure.service=umami"
+      # Service
+      - "traefik.http.services.umami.loadbalancer.server.port=3000"
+      - "traefik.docker.network=traefik-proxy"
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+
+networks:
+  postgres:
+    name: postgres
+    external: true
+  traefik-proxy:
+    name: traefik-proxy
+    external: true
+  watchtower:
+    name: watchtower
+    external: true
