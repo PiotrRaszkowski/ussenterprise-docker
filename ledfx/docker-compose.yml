@@ -7,7 +7,7 @@ services:
   # UI: http://<server-ip>:8888
   # ─────────────────────────────────────────────
   ledfx:
-    image: ghcr.io/ledfx/ledfx:latest
+    image: ghcr.io/ledfx/ledfx:2.1.5
     container_name: ledfx
     restart: unless-stopped
     network_mode: host
@@ -28,7 +28,7 @@ services:
   # Audio is piped to LedFX via PulseAudio socket
   # ─────────────────────────────────────────────
   shairport-sync:
-    image: mikebrady/shairport-sync:latest
+    image: mikebrady/shairport-sync:4.3.7
     container_name: shairport-ledfx
     restart: unless-stopped
     network_mode: host
