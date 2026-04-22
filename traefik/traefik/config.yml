@@ -1,0 +1,50 @@
+http:
+  middlewares:
+    secureHeaders:
+      headers:
+        sslRedirect: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+
+    ipWhitelist:
+      ipWhiteList:
+        sourceRange:
+          - "127.0.0.1/32"
+          # Add your trusted IPs here
+          # - "192.168.1.0/24"
+
+  routers:
+    homeassistant:
+      rule: "Host(`ha.lagowska46.ovh`)"
+      service: homeassistant-service
+      entryPoints:
+        - https
+      middlewares:
+        - secureHeaders  # opcjonalnie: użyj istniejącego middleware
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    homeassistant-service:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.10.100:8123"
+        passHostHeader: true
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+    no-h2:
+      minVersion: VersionTLS12
+      alpnProtocols:
+        - http/1.1

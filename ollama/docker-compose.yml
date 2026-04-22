@@ -1,0 +1,89 @@
+version: "3.8"
+
+services:
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 0
+              capabilities: [gpu]
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_NUM_PARALLEL=1
+    volumes:
+      - ollama:/root/.ollama
+    networks:
+      - ollama
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:latest
+    # build directly from the GitHub repo
+    #build:
+    #  context: https://github.com/open-webui/open-webui.git
+    #  dockerfile: Dockerfile
+    #  args:
+    #    OLLAMA_BASE_URL: "/ollama"
+    #image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    depends_on:
+      - ollama
+    volumes:
+      - open-webui:/app/backend/data
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
+      - ENABLE_SIGNUP=${ENABLE_SIGNUP:-false}  # Wyłącz rejestrację po utworzeniu pierwszego konta
+      - DEFAULT_USER_ROLE=${DEFAULT_USER_ROLE:-pending}
+      - WEBUI_AUTH=true
+      # - WEBUI_NAME="Moja Ollama"
+      # - ENABLE_COMMUNITY_SHARING=false
+      # - ENABLE_MESSAGE_RATING=false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks:
+      - traefik-proxy
+      - ollama
+    labels:
+      - "traefik.enable=true"
+
+      # HTTP -> redirect do HTTPS
+      - "traefik.http.routers.open-webui.entrypoints=http"
+      - "traefik.http.routers.open-webui.rule=Host(`ollama.lagowska46.ovh`)"
+      - "traefik.http.middlewares.open-webui-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.open-webui.middlewares=open-webui-https-redirect"
+
+      # HTTPS router
+      - "traefik.http.routers.open-webui-secure.entrypoints=https"
+      - "traefik.http.routers.open-webui-secure.rule=Host(`ollama.lagowska46.ovh`)"
+      - "traefik.http.routers.open-webui-secure.tls=true"
+      - "traefik.http.routers.open-webui-secure.tls.certresolver=letsencrypt"
+
+      # Service
+      - "traefik.http.routers.open-webui-secure.service=open-webui"
+      - "traefik.http.services.open-webui.loadbalancer.server.port=8080"
+      - "traefik.http.services.open-webui.loadbalancer.server.scheme=http"
+
+      # Upewnij się, że Traefik używa właściwej sieci Docker
+      - "traefik.docker.network=traefik-proxy"
+
+
+networks:
+  traefik-proxy:
+    external: true
+    name: traefik-proxy
+  ollama:
+    name: ollama
+    driver: bridge
+
+volumes:
+  ollama:
+  open-webui:
+

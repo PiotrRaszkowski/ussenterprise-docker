@@ -1,0 +1,13 @@
+services:
+  dnsmasq:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dnsmasq
+    cap_add:
+      - NET_ADMIN
+    network_mode: "host"
+    restart: always
+    volumes:
+      - ./conf:/etc/dnsmasq
+    

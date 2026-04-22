@@ -1,0 +1,558 @@
+mqtt:
+  enabled: true
+  host: 192.168.10.100
+  user: frigate
+  password: $frigate1234#
+
+tls:
+  enabled: false
+
+genai:
+  provider: ollama
+  base_url: http://ussenterprise:11434
+  model: qwen3-vl:235b-cloud
+semantic_search:
+  enabled: true
+  reindex: false
+  model_size: large
+review:
+  genai:
+    enabled: true
+    preferred_language: Polish
+    image_source: recordings
+    additional_concerns:
+      - zwierzęta na terenie posesji
+      - brama lub furtka pozostawiona otwarta
+      - paczka pozostawiona pod drzwiami
+      - pojazd zaparkowany na podjeździe dłużej niż zwykle
+    activity_context_prompt: |
+      ### Normalna aktywność — Poziom 0
+      - Znane/zweryfikowane osoby (face recognition) w dowolnej strefie o dowolnej porze
+      - Osoby z psami na terenie osiedla
+      - Dostawy i usługi w godzinach dziennych (6:00-22:00): kurier niosący paczkę, zostawiający przesyłkę, odchodzący
+      - Pracownicy serwisowi z widocznymi narzędziami, mundurami lub pojazdami serwisowymi w ciągu dnia
+      - Aktywność ograniczona wyłącznie do przestrzeni publicznej (chodniki, ulice) bez wchodzenia na teren posesji
+      - Samochody przejeżdżające drogą lub parkujące na krótko
+ 
+      ### Podejrzana aktywność — Poziom 1
+      - **Próby otwierania drzwi/okien/klamek pojazdów lub budynków** — ZAWSZE Poziom 1, niezależnie od pory i czasu trwania
+      - **Niezidentyfikowana osoba na terenie prywatnym (podjazd, przy pojazdach/budynkach) w godzinach 23:00-5:00** — ZAWSZE Poziom 1, niezależnie od aktywności i czasu trwania
+      - Zabieranie przedmiotów nienależących do danej osoby (paczki, rzeczy z podjazdu, przedmioty z ogrodu)
+      - Wspinanie się lub przeskakiwanie przez ogrodzenia/bariery w celu dostania się na teren posesji
+      - Próby ukrycia działań lub przedmiotów przed kamerami
+      - Długotrwałe kręcenie się: przebywanie w tym samym miejscu bez widocznego celu przez większość sekwencji
+      - Zaglądanie do okien lub przez ogrodzenie
+      - Nieznany samochód zaparkowany na podjeździe nocą
+ 
+      ### Krytyczne zagrożenia — Poziom 2
+      - Widoczne narzędzia włamywacze (łomy, nożyce do śrub, wytrychy)
+      - Widoczna broń (pistolet, nóż, kij bejsbolowy używany agresywnie)
+      - Trwające forsowanie wejścia (wyważanie drzwi, wybijanie okien)
+      - Agresja fizyczna lub przemoc wobec osób
+      - Aktywne niszczenie mienia lub kradzież w toku
+ 
+      ### Reguły oceny — stosuj w tej kolejności:
+      1. **Jeśli osoba jest zweryfikowana/znana** (sub_label z face recognition) → Poziom 0, niezależnie od pory i aktywności
+      2. **Jeśli osoba jest niezidentyfikowana:**
+        - Sprawdź porę: noc (23:00-5:00) + teren prywatny (podjazd, ogród, przy drzwiach) → Poziom 1
+        - Sprawdź działania: testowanie drzwi/klamek, zabieranie przedmiotów, wspinanie się → Poziom 1
+        - W przeciwnym razie: dzień/wieczór (6:00-22:00) z wyraźnym uzasadnionym celem (dostawa, serwis) → Poziom 0
+      3. **Eskaluj do Poziomu 2 jeśli:** broń, narzędzia włamywacze, forsowanie wejścia w toku, przemoc lub aktywne niszczenie mienia
+ 
+      Sama obecność niezidentyfikowanej osoby na terenie prywatnym w godzinach nocnych jest z natury podejrzana i wymaga uwagi, niezależnie od tego jaką aktywność wydaje się wykonywać i jak krótka jest sekwencja.
+
+objects:
+  track:
+    - person
+    - car
+    - dog
+    - cat
+  filters:
+    person:
+      min_area: 5000
+      max_area: 240000
+      min_ratio: 0.3
+      max_ratio: 0.8
+    car:
+      min_area: 10000
+      max_area: 500000
+      min_ratio: 1.5
+      max_ratio: 3.0
+  genai:
+    enabled: true
+    # ZMIANA: Generuj opisy GenAI TYLKO dla osób i samochodów (nie psów/kotów)
+    objects:
+      - person
+      - car
+    # ZMIANA: Wysyłaj opisy po zakończeniu + po 3 znaczących zmianach
+    # (szybsze opisy dla powiadomień w trakcie zdarzenia)
+    send_triggers:
+      tracked_object_end: true
+      after_significant_updates: 3
+    # Custom prompts dostosowane do systemu alarmowego
+    prompt: >-
+      Przeanalizuj sekwencję obrazów z kamery bezpieczeństwa {camera} zawierających obiekt {label}. 
+      Skup się na prawdopodobnym zamiarze i zachowaniu {label} na podstawie jego akcji i ruchu.
+      Nie opisuj wyglądu ani otoczenia. Odpowiedz po polsku.
+    object_prompts:
+      person: >-
+        Zbadaj główną osobę w tych obrazach z kamery {camera}. 
+        Co robi i co mogą sugerować jej działania o jej zamiarze 
+        (np. podchodzenie do drzwi, odchodzenie, stanie w miejscu, 
+        rozglądanie się, testowanie klamek)?
+        Jeśli osoba jest znana (sub_label: {sub_label}), zaznacz to.
+        Nie opisuj otoczenia. Odpowiedz krótko, 1-2 zdania, po polsku.
+      car: >-
+        Opisz ruch i cel pojazdu w tych obrazach z kamery {camera}. 
+        Czy parkuje, podjeżdża, odjeżdża, kręci się?
+        Jeśli widoczne logo firmy kurierskiej — wymień. Odpowiedz krótko po polsku.
+    
+ffmpeg:
+  hwaccel_args: preset-nvidia-h264
+  input_args: preset-rtsp-restream
+  output_args:
+    record: preset-record-generic
+
+record:
+  enabled: true
+  continuous:
+    days: 3
+  motion:
+    days: 4
+  alerts:
+    retain:
+      days: 14
+      mode: all
+  detections:
+    retain:
+      days: 7
+      mode: motion
+snapshots:
+  enabled: true
+  retain:
+    default: 7
+    objects:
+      person: 14
+
+go2rtc:
+  webrtc:
+    candidates:
+      - 192.168.10.100:8555
+      - stun:8555
+
+  streams:
+    garage_01:
+      - rtsp://frigate:frigate11235813@192.168.30.206/cam/realmonitor?channel=1&subtype=0
+    garage_01_sub:
+      - rtsp://frigate:frigate11235813@192.168.30.206/cam/realmonitor?channel=1&subtype=1
+    front_house_01:
+      - rtsp://frigate:Bev3j5wVhSzFsyCr@192.168.30.204/streaming/channels/101
+    front_house_01_sub:
+      - rtsp://frigate:Bev3j5wVhSzFsyCr@192.168.30.204/streaming/channels/102
+    front_house_02:
+      - rtsp://frigate:dEMVFZFoeBNz63eg@192.168.30.202:554/Streaming/Channels/101
+    front_house_02_sub:
+      - rtsp://frigate:dEMVFZFoeBNz63eg@192.168.30.202:554/Streaming/Channels/102
+    back_garden_01:
+      - rtsp://frigate:gate112358@192.168.30.201/streaming/channels/101
+    back_garden_01_sub:
+      - rtsp://frigate:gate112358@192.168.30.201/streaming/channels/102
+    front_doors_01:
+      - rtsp://frigate:gate1365@192.168.30.200:554/Streaming/Channels/101
+    front_doors_01_sub:
+      - rtsp://frigate:gate1365@192.168.30.200:554/Streaming/Channels/102
+    front_doors_02:
+      - rtsp://frigate:gate1366@192.168.30.203:554/Streaming/Channels/101
+    front_doors_02_sub:
+      - rtsp://frigate:gate1366@192.168.30.203:554/Streaming/Channels/102
+    front_gate:
+      - ffmpeg:http://192.168.30.205/flv?port=1935&app=bcs&stream=channel0_main.bcs&user=frigate&password=frigate1234#video=copy#audio=copy#audio=opus
+      - rtsp://192.168.30.205/h264Preview_01_main
+    front_gate_sub:
+      - ffmpeg:http://192.168.30.205/flv?port=1935&app=bcs&stream=channel0_ext.bcs&user=frigate&password=frigate1234
+      - rtsp://192.168.30.205/h264Preview_01_sub
+
+cameras:
+  front_gate:
+    enabled: true
+    audio:
+      enabled: true
+    ffmpeg:
+      apple_compatibility: true
+      inputs:
+        - path: rtsp://127.0.0.1:8554/front_gate?video=copy&audio=aac
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/front_gate_sub?video=copy&audio=aac
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+            - audio
+      output_args:
+        record: preset-record-generic-audio-copy
+    detect:
+      enabled: true
+    objects:
+      track:
+        - person
+        - umbrella
+        - car
+        - dog
+      genai:
+        enabled: true
+        objects:
+          - person
+          - car
+    motion:
+      threshold: 30
+      contour_area: 10
+      improve_contrast: true
+    zones:
+      Droga:
+        coordinates: 
+          0.116,0.55,0.178,0.554,0.167,0.569,0.242,0.583,0.511,0.611,0.742,0.618,0.997,0.598,0.999,0.775,0.877,0.836,0.655,0.88,0.447,0.85,0.273,0.776,0.262,0.681,0.059,0.602,0.041,0.595,0.001,0.593,0.001,0.545
+        loitering_time: 0
+      Chodnik:
+        coordinates: 0.445,0.851,0.288,0.998,0.636,0.997,0.658,0.882
+        loitering_time: 2
+        inertia: 3
+    review:
+      alerts:
+        required_zones: Chodnik
+      detections:
+        required_zones: Chodnik
+    notifications:
+      enabled: true
+
+  garage_01:
+    enabled: true
+    ffmpeg:
+      apple_compatibility: true
+      inputs:
+        - path: rtsp://127.0.0.1:8554/garage_01
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/garage_01_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+    objects:
+      genai:
+        enabled: false
+    review:
+      alerts:
+        enabled: false
+      detections:
+        enabled: false
+      genai:
+        enabled: false
+    detect:
+      enabled: true
+    notifications:
+      enabled: true
+
+  front_house_01:
+    enabled: true
+    ffmpeg:
+      apple_compatibility: true
+      inputs:
+        - path: rtsp://127.0.0.1:8554/front_house_01
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/front_house_01_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+            - audio
+    detect:
+      enabled: true
+    objects:
+      track:
+        - person
+        - umbrella
+        - car
+        - dog
+      genai:
+        enabled: true
+        # ZMIANA: use_snapshot: false — sekwencja klatek lepsza do oceny intencji
+        use_snapshot: false
+        objects:
+          - person
+        # ZMIANA: Generuj opisy tylko w strefach alarmowych
+        required_zones:
+          - Podjazd
+          - Alarm
+    zones:
+      Podjazd:
+        coordinates: 
+          0.035,0.677,0.149,0.996,0.823,0.998,0.835,0.634,0.207,0.412,0.039,0.535,0.069,0.646
+        loitering_time: 2
+        inertia: 3
+      Chodnik:
+        coordinates: 
+          0.744,0.591,0.752,0.526,0.795,0.535,0.799,0.496,0.695,0.461,0.648,0.559
+        loitering_time: 2
+        inertia: 3
+      Alarm:
+        coordinates: 
+          0,0.722,0.417,0.327,0.804,0.404,0.788,0.606,0.836,0.628,0.824,0.994,0.002,0.994
+        loitering_time: 0
+        inertia: 3
+    motion: {}
+    review:
+      alerts:
+        required_zones:
+          - Podjazd
+          - Chodnik
+          - Alarm
+      detections:
+        required_zones: [Podjazd, Chodnik]
+    notifications:
+      enabled: true
+
+  front_house_02:
+    enabled: true
+    ffmpeg:
+      apple_compatibility: true
+      inputs:
+        - path: rtsp://127.0.0.1:8554/front_house_02
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/front_house_02_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+    detect:
+      enabled: true
+    objects:
+      track:
+        - person
+        - umbrella
+        - car
+        - dog
+      genai:
+        enabled: true
+        # ZMIANA: use_snapshot: false
+        use_snapshot: false
+        objects:
+          - person
+        # ZMIANA: Generuj opisy tylko w strefach alarmowych
+        required_zones:
+          - Podjazd
+          - Alarm
+    motion: {}
+    zones:
+      Podjazd:
+        coordinates: 
+          0.908,0.998,1,0.681,1,0.524,0.762,0.441,0.647,0.512,0.146,0.734,0.106,0.76,0.125,0.992
+        loitering_time: 2
+        inertia: 3
+      Chodnik:
+        coordinates: 
+          0.202,0.719,0.183,0.64,0.137,0.657,0.111,0.461,0.181,0.435,0.191,0.459,0.357,0.398,0.392,0.411,0.207,0.482,0.299,0.671
+        loitering_time: 2
+        inertia: 3
+      Alarm:
+        coordinates: 
+          0.253,0.372,0.513,0.457,0.756,0.543,0.918,0.61,1,0.652,0.906,1,0.126,0.998,0.104,0.774,0.149,0.744,0.107,0.421
+        loitering_time: 0
+        inertia: 3
+    review:
+      alerts:
+        required_zones:
+          - Podjazd
+          - Chodnik
+          - Alarm
+      detections:
+        required_zones: [Podjazd, Chodnik]
+    notifications:
+      enabled: true
+  back_garden_01:
+    enabled: true
+    ffmpeg:
+      apple_compatibility: true
+      inputs:
+        - path: rtsp://127.0.0.1:8554/back_garden_01
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/back_garden_01_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+    detect:
+      enabled: true
+    zones:
+      Trawnik:
+        coordinates: 
+          0.348,0.425,0.643,0.703,0.867,0.89,0.956,0.963,1,0.997,1,0.371,0.719,0.292,0.592,0.306,0.4,0.343,0.282,0.366
+        loitering_time: 2
+        inertia: 3
+      Taras:
+        coordinates: 0.149,0.47,0.336,0.407,0.993,0.994,0.198,0.992
+        loitering_time: 2
+        inertia: 3
+    objects:
+      track:
+        - person
+        - car
+        - dog
+        - cat
+      # ZMIANA: Dodane — opisy GenAI tylko dla osób na terenie ogrodu
+      genai:
+        enabled: true
+        objects:
+          - person
+        required_zones:
+          - Trawnik
+          - Taras
+    motion:
+      mask: 
+        0.131,0.065,0.557,0.079,0.561,0.137,0.695,0.173,0.747,0.152,0.779,0.164,0.864,0.171,0.882,0.179,0.906,0.197,0.953,0.225,0.991,0.173,0.998,0.087,0.998,0.005,0.13,0.005
+    review:
+      alerts:
+        required_zones:
+          - Trawnik
+          - Taras
+      detections:
+        required_zones: [Trawnik, Taras]
+    notifications:
+      enabled: true
+
+  front_doors_01:
+    enabled: true
+    ffmpeg:
+      apple_compatibility: true
+      inputs:
+        - path: rtsp://127.0.0.1:8554/front_doors_01
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/front_doors_01_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+    detect:
+      enabled: true
+    zones:
+      Chodnik:
+        coordinates: 
+          0,0.452,0,0.29,0.011,0.259,0.115,0.361,0.26,0.481,0.391,0.309,0.511,0.165,0.575,0.079,0.684,0.124,0.679,0.158,0.793,0.208,0.69,0.805,0.684,0.839,0.72,0.864,0.685,0.997,0.317,0.997,0,0.999,0,0.911,0.111,0.678
+        loitering_time: 2
+        inertia: 3
+      Podjazd:
+        coordinates: 0.682,0.127,0.346,0.031,0.373,0.002,0.693,0.002
+        loitering_time: 2
+        inertia: 3
+      Alarm:
+        coordinates: 
+          0.002,0.995,0.688,0.998,0.717,0.86,0.684,0.839,0.797,0.212,0.682,0.154,0.692,0.002,0.367,0,0.187,0.152,0,0.365
+        objects: person
+        loitering_time: 0
+        inertia: 3
+    objects:
+      track:
+        - person
+        - umbrella
+        - car
+        - dog
+      # ZMIANA: Dodane — opisy GenAI dla osób w strefie Alarm
+      genai:
+        enabled: true
+        objects:
+          - person
+        required_zones:
+          - Alarm
+          - Chodnik
+    review:
+      alerts:
+        required_zones:
+          - Chodnik
+          - Alarm
+          - Podjazd
+      detections:
+        required_zones: [Podjazd, Chodnik]
+    notifications:
+      enabled: true
+  front_doors_02:
+    enabled: true
+    ffmpeg:
+      apple_compatibility: true
+      inputs:
+        - path: rtsp://127.0.0.1:8554/front_doors_02
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/front_doors_02_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+    detect:
+      enabled: true
+    zones:
+      Chodnik:
+        coordinates: 
+          0.78,0.332,0.517,0.349,0.477,0.268,0.259,0.303,0.182,1,0.789,0.996,0.689,0.747,0.557,0.448,0.85,0.397
+        loitering_time: 2
+        inertia: 3
+      Alarm:
+        coordinates: 
+          0.255,0.213,0.568,0.184,0.603,0.211,0.767,0.325,0.868,0.413,1,0.571,0.998,0.999,0.176,0.999
+        loitering_time: 0
+        inertia: 3
+        objects: person
+    objects:
+      track:
+        - person
+        - umbrella
+        - car
+        - dog
+      # ZMIANA: Dodane — opisy GenAI dla osób w strefie Alarm
+      genai:
+        enabled: true
+        objects:
+          - person
+        required_zones:
+          - Alarm
+          - Chodnik
+    review:
+      alerts:
+        required_zones:
+          - Chodnik
+          - Alarm
+      detections:
+        required_zones: [Chodnik]
+    notifications:
+      enabled: true
+detectors:
+  coral:
+    type: edgetpu
+    device: usb
+
+version: 0.17-0
+detect:
+  enabled: true
+face_recognition:
+  enabled: true
+  model_size: large
+lpr:
+  enabled: true
+classification:
+  bird:
+    enabled: false
+  custom:
+    Annika:
+      enabled: true
+      name: Annika
+      threshold: 0.8
+      object_config:
+        objects:
+          - car
+        classification_type: attribute
+notifications:
+  enabled: true
+  email: reszkapl@gmail.com

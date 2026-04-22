@@ -1,0 +1,61 @@
+services:
+  mariadb:
+    image: mariadb:12
+    container_name: mariadb
+    restart: unless-stopped
+    networks:
+      - mariadb
+    environment:
+      - MYSQL_ROOT_PASSWORD=${ROOT_PASSWORD}
+      #- MYSQL_DATABASE=${MARIADB_NAME}
+      #- MYSQL_USER=${DB_USER}
+      #- MYSQL_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: phpmyadmin
+    networks:
+      - mariadb
+      - traefik-proxy
+    environment:
+      - PMA_ARBITRARY=1
+      - PMA_HOST=mariadb
+    depends_on:
+      - mariadb
+    labels:
+      - "traefik.enable=true"
+
+      # HTTP -> redirect do HTTPS
+      - "traefik.http.routers.phpmyadmin.entrypoints=http"
+      - "traefik.http.routers.phpmyadmin.rule=Host(`phpmyadmin.lagowska46.ovh`)"
+      - "traefik.http.middlewares.phpmyadmin-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.phpmyadmin.middlewares=phpmyadmin-https-redirect"
+
+      # HTTPS router
+      - "traefik.http.routers.phpmyadmin-secure.entrypoints=https"
+      - "traefik.http.routers.phpmyadmin-secure.rule=Host(`phpmyadmin.lagowska46.ovh`)"
+      - "traefik.http.routers.phpmyadmin-secure.tls=true"
+      - "traefik.http.routers.phpmyadmin-secure.tls.certresolver=letsencrypt"
+
+      # Service
+      - "traefik.http.routers.phpmyadmin-secure.service=phpmyadmin"
+      - "traefik.http.services.phpmyadmin.loadbalancer.server.port=80"
+      - "traefik.http.services.phpmyadmin.loadbalancer.server.scheme=http"
+
+      # Upewnij się, że Traefik używa właściwej sieci Docker
+      - "traefik.docker.network=traefik-proxy"
+
+networks:
+  mariadb:
+    name: mariadb
+    external: true
+  traefik-proxy:
+    name: traefik-proxy
+    external: true
+
+volumes:
+  mariadb_data:
+    name: mariadb_data

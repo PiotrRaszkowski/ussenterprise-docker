@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+  lagowska46-ovh-dyndns:
+    build: .
+    image: ovh-dyndns:latest
+    container_name: lagowska46-ovh-dyndns
+    restart: unless-stopped
+    environment:
+      # zmień na swoją domenę i dane
+      HOSTNAMES: "lagowska46.ovh ha.lagowska46.ovh frigate.lagowska46.ovh traefik.lagowska46.ovh phpmyadmin.lagowska46.ovh ollama.lagowska46.ovh keycloak.lagowska46.ovh thirdleg.lagowska46.ovh b2borganizer.lagowska46.ovh pgadmin.lagowska46.ovh n8n.lagowska46.ovh laforge.lagowska46.ovh jordan.lagowska46.ovh"
+      OVH_USER: lagowska46.ovh-dynhost
+      OVH_PASSWORD: bs27tm3GuwDMn9N##P4yrJwNsYa3EMX
+      INTERVAL: 300    # w sekundach, co ile ma się odświeżać (domyślnie 300s)

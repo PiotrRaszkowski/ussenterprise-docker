@@ -1,0 +1,48 @@
+# ---- Secrets / credentials ----
+.env
+.env.*
+!.env.example
+*.env.bak*
+
+# crawl4ai (plik z komentowanymi API keys, ale dla pewności)
+crawl4ai/.llm.env
+
+# postgresql
+postgresql/pgpassfile
+postgresql/servers.json
+
+# litellm OAuth tokens
+litellm/auth-tokens/
+
+# traefik ACME certs (private keys)
+traefik/traefik/acme.json
+
+# frigate secrets
+frigate/config/.jwt_secret
+frigate/config/notifications.pem
+
+# ---- Runtime state / caches ----
+# frigate databases & cache
+frigate/config/*.db
+frigate/config/*.db-wal
+frigate/config/*.db-shm
+frigate/config/*.db.backup
+frigate/config/*.db.corrupted
+frigate/config/backup.db
+frigate/config/backup_config.yaml
+frigate/config/config.yaml.backup
+frigate/config/model_cache/
+frigate/config/.exports
+frigate/config/.timeline
+frigate/config/.vacuum
+frigate/config/.search_stats.json
+frigate/config/stats
+frigate/config/go2rtc_homekit.yml
+
+# ledfx pulseaudio runtime
+ledfx/pulse/
+
+# ---- Generic backups ----
+*.bak
+*.bak.*
+*.backup

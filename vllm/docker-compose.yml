@@ -1,0 +1,50 @@
+services:
+  vllm-llama-31-8b-instruct:
+    image: vllm/vllm-openai:latest
+    container_name: vllm-llama-31-8b-instruct
+    ports:
+      - "11810:8000"
+    volumes:
+      # Persistent volume for model cache (saves ~28GB download on restart)
+      - vllm-models:/root/.cache/huggingface
+    environment:
+      # Optional: HuggingFace token for gated models (DeepSeek-R1 is public, so not required)
+      # - HF_TOKEN=${HF_TOKEN}
+
+      # GPU selection (defaults to all GPUs)
+      - CUDA_VISIBLE_DEVICES=0
+
+      # Logging level
+      - LOG_LEVEL=info
+
+    command: >
+      --model meta-llama/Llama-3.1-8B-Instruct
+      --trust-remote-code
+      --max-model-len 8192
+      --gpu-memory-utilization 0.9
+      --dtype auto
+      --api-key optional-key-for-testing
+      --served-model-name deepseek-r1-14b
+      --host 0.0.0.0
+      --port 8000
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 300s  # 5 minutes for model download on first run
+
+    restart: unless-stopped
+
+volumes:
+  vllm-models:
+    driver: local

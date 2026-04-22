@@ -1,0 +1,50 @@
+services:
+  jordan:
+    image: ghcr.io/piotrraszkowski/jordan:latest
+    container_name: jordan
+    restart: unless-stopped
+    networks:
+      - traefik-proxy
+      - watchtower
+    user: "root"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - jordan-data:/data
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:sqlite:/data/jordan.db
+      - SPRING_PROFILES_ACTIVE=prod
+      - LOGGING_LEVEL_ROOT=INFO
+      - LOGGING_LEVEL_PL_RASZKOWSKI_JORDAN=INFO
+      - JORDAN_API_KEY=${JORDAN_API_KEY}
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      # HTTP to HTTPS redirect
+      - "traefik.http.routers.jordan.entrypoints=http"
+      - "traefik.http.routers.jordan.rule=(Host(`${JORDAN_DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/sse`) || PathPrefix(`/mcp`) || PathPrefix(`/swagger-ui`) || PathPrefix(`/v3`) || PathPrefix(`/actuator`)))"
+      - "traefik.http.middlewares.jordan-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.jordan.middlewares=jordan-https-redirect"
+      # HTTPS configuration
+      - "traefik.http.routers.jordan-secure.entrypoints=https"
+      - "traefik.http.routers.jordan-secure.rule=(Host(`${JORDAN_DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/sse`) || PathPrefix(`/mcp`) || PathPrefix(`/swagger-ui`) || PathPrefix(`/v3`) || PathPrefix(`/actuator`)))"
+      - "traefik.http.routers.jordan-secure.tls=true"
+      - "traefik.http.routers.jordan-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.jordan-secure.service=jordan"
+      # Service configuration
+      - "traefik.http.services.jordan.loadbalancer.server.port=8080"
+      - "traefik.docker.network=traefik-proxy"
+      - "com.centurylinklabs.watchtower.enable=true"
+    # healthcheck disabled — buildpack image has no curl, and Traefik
+    # filters unhealthy containers. The app exposes /actuator/health for manual checks.
+
+volumes:
+  jordan-data:
+
+networks:
+  traefik-proxy:
+    name: "traefik-proxy"
+    external: true
+  watchtower:
+    name: "watchtower"
+    external: true

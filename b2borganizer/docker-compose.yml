@@ -1,0 +1,87 @@
+services:
+  b2borganizer-services:
+    image: ghcr.io/b2borganizer/b2borganizer-services:0.0.1-SNAPSHOT
+    container_name: b2borganizer-services
+    restart: always
+    ports:
+      - 8080:8080
+    networks:
+      - mongo-network
+      - traefik-proxy
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      - SPRING_APPLICATION_JSON=${SPRING_APPLICATION_JSON}
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+
+      # HTTP to HTTPS redirect
+      - "traefik.http.routers.b2borganizer-services.entrypoints=http"
+      - "traefik.http.routers.b2borganizer-services.rule=(Host(`${B2BORGANIZER_DOMAIN}`) && PathPrefix(`/api`))"
+      - "traefik.http.middlewares.b2borganizer-services-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.b2borganizer-services.middlewares=b2borganizer-services-https-redirect"
+
+      # HTTPS configuration
+      - "traefik.http.routers.b2borganizer-services-secure.entrypoints=https"
+      - "traefik.http.routers.b2borganizer-services-secure.rule=(Host(`${B2BORGANIZER_DOMAIN}`) && PathPrefix(`/api`))"
+      - "traefik.http.routers.b2borganizer-services-secure.tls=true"
+      - "traefik.http.routers.b2borganizer-services-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.b2borganizer-services-secure.service=b2borganizer-services"
+
+      # Strip /api prefix before forwarding to backend
+      - "traefik.http.middlewares.b2borganizer-services-stripprefix.stripprefix.prefixes=/api"
+      - "traefik.http.routers.b2borganizer-services-secure.middlewares=b2borganizer-services-stripprefix"
+
+      # Service configuration
+      - "traefik.http.services.b2borganizer-services.loadbalancer.server.port=8080"
+      - "traefik.docker.network=traefik-proxy"
+      - "com.centurylinklabs.watchtower.enable=false"
+    logging:
+        driver: "json-file"
+        options:
+          max-size: "10m"
+          max-file: "3"
+
+  b2borganizer-web:
+    image: ghcr.io/b2borganizer/b2borganizer-web:latest
+    container_name: b2borganizer-web
+    restart: always
+    ports:
+      - 5173:5173
+    networks:
+      -  mongo-network
+      - traefik-proxy
+    environment: 
+      - VITE_SIMPLE_REST_URL=https://b2borganizer.lagowska46.ovh/api
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+
+      # HTTP to HTTPS redirect
+      - "traefik.http.routers.b2borganizer-web.entrypoints=http"
+      - "traefik.http.routers.b2borganizer-web.rule=Host(`${B2BORGANIZER_DOMAIN}`)"
+      - "traefik.http.middlewares.b2borganizer-web-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.b2borganizer-web.middlewares=b2borganizer-web-https-redirect"
+
+      # HTTPS configuration
+      - "traefik.http.routers.b2borganizer-web-secure.entrypoints=https"
+      - "traefik.http.routers.b2borganizer-web-secure.rule=Host(`${B2BORGANIZER_DOMAIN}`)"
+      - "traefik.http.routers.b2borganizer-web-secure.tls=true"
+      - "traefik.http.routers.b2borganizer-web-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.b2borganizer-web-secure.service=b2borganizer-web"
+
+      # Service configuration
+      - "traefik.http.services.b2borganizer-web.loadbalancer.server.port=5173"
+      - "traefik.docker.network=traefik-proxy"
+
+      - "com.centurylinklabs.watchtower.enable=true"
+
+networks:
+  mongo-network:
+    name: 'mongo-network'
+    external: true
+  traefik-proxy:
+    name: 'traefik-proxy'
+    external: true

@@ -1,0 +1,23 @@
+services:
+  crawl4ai:
+    image: unclecode/crawl4ai:latest
+    container_name: crawl4ai
+    restart: unless-stopped
+    shm_size: "1g"
+    ports:
+      - "11235:11235"
+    env_file:
+      - .env
+      - .llm.env
+    volumes:
+      - crawl4ai_data:/app/.crawl4ai
+    networks:
+      - traefik-proxy
+
+networks:
+  traefik-proxy:
+    external: true
+    name: traefik-proxy
+
+volumes:
+  crawl4ai_data:

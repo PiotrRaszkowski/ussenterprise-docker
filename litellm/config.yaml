@@ -1,0 +1,206 @@
+model_list:
+  # ── claude-opus ────────────────────────────────────────
+  - model_name: claude-opus
+    litellm_params:
+      model: anthropic/claude-opus-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+      order: 1
+
+  - model_name: claude-opus
+    litellm_params:
+      model: openrouter/anthropic/claude-opus-4-6
+      api_key: os.environ/OPENROUTER_API_KEY
+      order: 2
+
+  # ── claude-sonnet ──────────────────────────────────────
+  - model_name: claude-sonnet
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+      order: 1
+
+  - model_name: claude-sonnet
+    litellm_params:
+      model: openrouter/anthropic/claude-sonnet-4-6
+      api_key: os.environ/OPENROUTER_API_KEY
+      order: 2
+
+  # ── kimi-k2.5 ─────────────────────────────────────────
+  - model_name: kimi-k2.5
+    litellm_params:
+      model: deepinfra/moonshotai/Kimi-K2.5
+      api_key: os.environ/DEEPINFRA_API_KEY
+      max_tokens: 262000
+      drop_params: true
+      order: 1
+    model_info:
+      supports_function_calling: true
+
+  - model_name: kimi-k2.5
+    litellm_params:
+      model: openrouter/moonshotai/kimi-k2.5
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 262000
+      drop_params: true
+      order: 2
+    model_info:
+      supports_function_calling: true
+
+  # ── coding (virtual model) ────────────────────────────
+  # Optimized for code: Anthropic Opus primary, MiniMax fallback
+  - model_name: coding
+    litellm_params:
+      model: anthropic/claude-opus-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+      order: 2
+    model_info:
+      supports_function_calling: true
+      supports_code_interpretation: true
+
+  - model_name: coding
+    litellm_params:
+      model: deepinfra/MiniMaxAI/MiniMax-M2.5
+      api_key: os.environ/DEEPINFRA_API_KEY
+      max_tokens: 196600
+      drop_params: true
+      order: 1
+    model_info:
+      supports_function_calling: true
+      supports_code_interpretation: true
+
+  # ── minimax-m2.5 ──────────────────────────────────────
+  - model_name: minimax-m2.5
+    litellm_params:
+      model: deepinfra/MiniMaxAI/MiniMax-M2.5
+      api_key: os.environ/DEEPINFRA_API_KEY
+      max_tokens: 196600
+      drop_params: true
+      order: 1
+    model_info:
+      supports_function_calling: true
+
+  - model_name: minimax-m2.5
+    litellm_params:
+      model: openrouter/minimax/minimax-m2.5
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 196600
+      drop_params: true
+      order: 2
+    model_info:
+      supports_function_calling: true
+
+  # ── glm-5 ─────────────────────────────────────────────
+  - model_name: glm-5
+    litellm_params:
+      model: openrouter/z-ai/glm-5
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 202800
+      drop_params: true
+      order: 1
+    model_info:
+      supports_function_calling: true
+
+  - model_name: glm-5
+    litellm_params:
+      model: openai/glm-5:cloud
+      api_base: http://ollama:11434/v1
+      api_key: os.environ/OLLAMA_API_KEY
+      drop_params: true
+      order: 2
+    model_info:
+      supports_function_calling: true
+
+  # ── qwen3.5 ───────────────────────────────────────────
+  - model_name: qwen3.5
+    litellm_params:
+      model: openrouter/qwen/qwen3.5-397b-a17b
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 65536
+      drop_params: true
+      order: 1
+    model_info:
+      supports_function_calling: true
+
+  - model_name: qwen3.5
+    litellm_params:
+      model: openai/qwen3.5:397b-cloud
+      api_base: http://ollama:11434/v1
+      api_key: os.environ/OLLAMA_API_KEY
+      drop_params: true
+      order: 2
+    model_info:
+      supports_function_calling: true
+
+  # ── gemini-3-flash (single) ───────────────────────────
+  - model_name: gemini-3-flash
+    litellm_params:
+      model: openrouter/google/gemini-3-flash-preview
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 65536
+      drop_params: true
+    model_info:
+      supports_function_calling: true
+
+  # ── gemini-embed (single) ─────────────────────────────
+  - model_name: gemini-embed
+    litellm_params:
+      model: gemini/gemini-embedding-001
+      api_key: os.environ/GEMINI_API_KEY
+
+  # ── GitHub Copilot (order 3 in claude groups) ──────────
+  - model_name: claude-opus
+    litellm_params:
+      model: github_copilot/claude-opus-4.6
+      drop_params: true
+      order: 3
+
+  - model_name: claude-sonnet
+    litellm_params:
+      model: github_copilot/claude-sonnet-4.6
+      drop_params: true
+      order: 3
+
+  # ── OpenAI Codex ──────────────────────────────────────
+  - model_name: codex/gpt-5.4
+    model_info:
+      mode: responses
+    litellm_params:
+      model: chatgpt/gpt-5.4
+      drop_params: true
+
+  - model_name: codex/gpt-5.3-codex
+    model_info:
+      mode: responses
+    litellm_params:
+      model: chatgpt/gpt-5.3-codex
+      drop_params: true
+
+general_settings:
+  store_model_in_db: true
+  store_prompts_in_spend_logs: true
+  maximum_spend_logs_retention_days: 7
+
+litellm_settings:
+  cache: false
+  cache_params:
+    type: "redis-semantic"
+    host: litellm-redis
+    port: 6379
+    ttl: 3600
+    similarity_threshold: 0.8
+    redis_semantic_cache_embedding_model: gemini/gemini-embedding-001
+
+router_settings:
+  routing_strategy: simple-shuffle
+  enable_pre_call_checks: true
+  num_retries: 2
+  timeout: 300
+  fallbacks:
+    - claude-opus:
+        - claude-sonnet
+        - kimi-k2.5
+    - claude-sonnet:
+        - kimi-k2.5
+        - qwen3.5
+    - gemini-3-flash:
+        - kimi-k2.5

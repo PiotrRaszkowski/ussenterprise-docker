@@ -1,0 +1,41 @@
+volumes:
+  ledfx-config:
+
+services:
+  # ─────────────────────────────────────────────
+  # LedFX - Audio Reactive LED Effect Engine
+  # UI: http://<server-ip>:8888
+  # ─────────────────────────────────────────────
+  ledfx:
+    image: ghcr.io/ledfx/ledfx:latest
+    container_name: ledfx
+    restart: unless-stopped
+    network_mode: host
+    command: ["--offline", "--clear-effects"]
+    volumes:
+      - ledfx-config:/home/ledfx/ledfx-config:rw
+      - ./pulse:/home/ledfx/.config/pulse:rw
+    depends_on:
+      - shairport-sync
+    logging:
+      options:
+        max-size: "200k"
+        max-file: "10"
+
+  # ─────────────────────────────────────────────
+  # Shairport-Sync - AirPlay Receiver for LedFX
+  # Shows as "LedFX" in AirPlay device list
+  # Audio is piped to LedFX via PulseAudio socket
+  # ─────────────────────────────────────────────
+  shairport-sync:
+    image: mikebrady/shairport-sync:latest
+    container_name: shairport-ledfx
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./shairport-sync.conf:/etc/shairport-sync.conf:ro
+      - ./pulse:/tmp
+    logging:
+      options:
+        max-size: "200k"
+        max-file: "10"

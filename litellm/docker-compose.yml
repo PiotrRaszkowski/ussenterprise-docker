@@ -1,0 +1,93 @@
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm
+    restart: unless-stopped
+    command:
+      - --config
+      - /app/config.yaml
+      - --port
+      - "4000"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://litellm:litellm@litellm-db:5432/litellm
+      - REDIS_HOST=litellm-redis
+      - REDIS_PORT=6379
+      - OLLAMA_API_BASE=http://ollama:11434
+    depends_on:
+      litellm-db:
+        condition: service_healthy
+      litellm-redis:
+        condition: service_healthy
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./auth-tokens:/root/.config/litellm
+    networks:
+      - litellm
+      - traefik-proxy
+      - ollama
+    labels:
+      # HTTP -> redirect to HTTPS
+      - "traefik.enable=true"
+      - "traefik.http.routers.litellm.entrypoints=http"
+      - "traefik.http.routers.litellm.rule=Host(`litellm.lagowska46.ovh`)"
+      - "traefik.http.middlewares.litellm-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.litellm.middlewares=litellm-https-redirect"
+      # HTTPS router
+      - "traefik.http.routers.litellm-secure.entrypoints=https"
+      - "traefik.http.routers.litellm-secure.rule=Host(`litellm.lagowska46.ovh`)"
+      - "traefik.http.routers.litellm-secure.tls=true"
+      - "traefik.http.routers.litellm-secure.tls.certresolver=letsencrypt"
+      # Service
+      - "traefik.http.routers.litellm-secure.service=litellm"
+      - "traefik.http.services.litellm.loadbalancer.server.port=4000"
+      - "traefik.http.services.litellm.loadbalancer.server.scheme=http"
+      - "traefik.docker.network=traefik-proxy"
+
+  litellm-db:
+    image: postgres:16-alpine
+    container_name: litellm-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: litellm
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - litellm-db-data:/var/lib/postgresql/data
+    networks:
+      - litellm
+
+  litellm-redis:
+    image: redis/redis-stack-server:latest
+    container_name: litellm-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - litellm-redis-data:/data
+    networks:
+      - litellm
+
+networks:
+  litellm:
+    name: litellm
+    driver: bridge
+  traefik-proxy:
+    external: true
+    name: traefik-proxy
+  ollama:
+    external: true
+    name: ollama
+
+volumes:
+  litellm-db-data:
+  litellm-redis-data:
