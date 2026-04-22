@@ -8,12 +8,13 @@ http:
         stsPreload: true
         stsSeconds: 31536000
 
-    ipWhitelist:
-      ipWhiteList:
+    lan-only:
+      ipAllowList:
         sourceRange:
           - "127.0.0.1/32"
-          # Add your trusted IPs here
-          # - "192.168.1.0/24"
+          - "192.168.0.0/16"    # home LAN (10.x, 30.x etc.)
+          - "100.64.0.0/10"     # Tailscale CGNAT
+          - "fd7a:115c:a1e0::/48"  # Tailscale IPv6
 
   routers:
     homeassistant:

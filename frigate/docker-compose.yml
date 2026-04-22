@@ -52,6 +52,9 @@ services:
       - "traefik.http.routers.frigate-secure.tls=true"
       - "traefik.http.routers.frigate-secure.tls.certresolver=letsencrypt"
 
+      # Only allow LAN + Tailscale clients
+      - "traefik.http.routers.frigate-secure.middlewares=lan-only@file"
+
       # Service
       - "traefik.http.routers.frigate-secure.service=frigate"
       - "traefik.http.services.frigate.loadbalancer.server.port=8971"
