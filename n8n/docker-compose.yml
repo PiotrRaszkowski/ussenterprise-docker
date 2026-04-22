@@ -44,8 +44,6 @@ services:
       # Service
       - "traefik.http.services.n8n.loadbalancer.server.port=5678"
       - "traefik.docker.network=traefik-proxy"
-      # Watchtower
-      - "com.centurylinklabs.watchtower.enable=true"
 
 volumes:
   n8n_data:
