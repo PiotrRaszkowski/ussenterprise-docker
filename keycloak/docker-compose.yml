@@ -15,8 +15,7 @@ services:
       KC_HOSTNAME: keycloak.lagowska46.ovh
       KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: xforwarded
-        #      KC_HOSTNAME_STRICT: "true"
-        #KC_HOSTNAME_STRICT_HTTPS: "true"
+      KC_HOSTNAME_STRICT_HTTPS: "true"
       KC_PROXY: edge
     command: start
     restart: unless-stopped
