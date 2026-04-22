@@ -40,6 +40,9 @@ services:
       - "traefik.http.routers.phpmyadmin-secure.tls=true"
       - "traefik.http.routers.phpmyadmin-secure.tls.certresolver=letsencrypt"
 
+      # LAN + Tailscale only
+      - "traefik.http.routers.phpmyadmin-secure.middlewares=lan-only@file"
+
       # Service
       - "traefik.http.routers.phpmyadmin-secure.service=phpmyadmin"
       - "traefik.http.services.phpmyadmin.loadbalancer.server.port=80"

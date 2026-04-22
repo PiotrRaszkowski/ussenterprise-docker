@@ -46,6 +46,8 @@ services:
       - "traefik.http.routers.pgadmin-secure.tls=true"
       - "traefik.http.routers.pgadmin-secure.tls.certresolver=letsencrypt"
       - "traefik.http.routers.pgadmin-secure.service=pgadmin"
+      # LAN + Tailscale only
+      - "traefik.http.routers.pgadmin-secure.middlewares=lan-only@file"
       # Service
       - "traefik.http.services.pgadmin.loadbalancer.server.port=80"
       - "traefik.docker.network=traefik-proxy"
