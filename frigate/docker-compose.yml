@@ -7,6 +7,7 @@ services:
     stop_grace_period: 30s # allow enough time to shut down the various services
     image: ghcr.io/blakeblackshear/frigate:stable
     shm_size: "1024mb" # update for your cameras based on calculation above
+    mem_limit: 14g   # cap RAM to protect other containers (prior OOM-kill)
     deploy:    # <------------- Add this section
       resources:
         reservations:
