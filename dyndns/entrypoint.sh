@@ -58,12 +58,16 @@ while true; do
             fi
         done
 
-        # wywołanie NextDNS (jeśli chcesz tylko raz, a nie per-host)
-        if [[ -n "${NEXTDNS_LINK:-}" ]]; then
-            RESPONSE="$(curl -sS --fail "${NEXTDNS_LINK}" || true)"
-            echo "$(date) > NextDNS response: ${RESPONSE:-brak odpowiedzi lub błąd}"
+        # NextDNS update:
+        # - NEXTDNS_LINK ustawione i niepuste → użyj tej wartości
+        # - NEXTDNS_LINK ustawione i puste     → pomiń (jawne wyłączenie, np. drugi kontener)
+        # - NEXTDNS_LINK nieustawione          → fallback do hardcoded linka (backward compat)
+        if [[ "${NEXTDNS_LINK+set}" == "set" ]]; then
+            if [[ -n "${NEXTDNS_LINK}" ]]; then
+                RESPONSE="$(curl -sS --fail "${NEXTDNS_LINK}" || true)"
+                echo "$(date) > NextDNS response: ${RESPONSE:-brak odpowiedzi lub błąd}"
+            fi
         else
-            # Zachowano oryginalny link; możesz go przenieść do zmiennej NEXTDNS_LINK
             RESPONSE="$(curl -s "https://link-ip.nextdns.io/ae661a/fd41ac377aece35f" || true)"
             echo "$(date) > NextDNS response: ${RESPONSE:-brak odpowiedzi lub błąd}"
         fi
