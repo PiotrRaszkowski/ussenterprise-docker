@@ -1,6 +1,6 @@
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0.5
+    image: quay.io/keycloak/keycloak:26.7.0
     container_name: keycloak
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
@@ -12,12 +12,14 @@ services:
         #      KC_DB_URL_PROPERTIES: "useSSL=false&allowPublicKeyRetrieval=true"
       KC_DB_USERNAME: ${KC_DB_USERNAME}
       KC_DB_PASSWORD: ${KC_DB_PASSWORD}
-      KC_HOSTNAME: keycloak.lagowska46.ovh
+      # Hostname v2 (Keycloak 26): pelny URL wymusza https na wystawianych adresach.
+      # KC_HOSTNAME_STRICT_HTTPS i KC_PROXY to opcje v1 — usuniete, Keycloak je zglaszal.
+      KC_HOSTNAME: https://keycloak.lagowska46.ovh
       KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: xforwarded
-      KC_HOSTNAME_STRICT_HTTPS: "true"
-      KC_PROXY: edge
     command: start
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
     networks:
       - keycloak
@@ -36,6 +38,15 @@ services:
       - "traefik.http.routers.keycloak-secure.rule=Host(`keycloak.lagowska46.ovh`)"
       - "traefik.http.routers.keycloak-secure.tls=true"
       - "traefik.http.routers.keycloak-secure.tls.certresolver=letsencrypt"
+      # Konsola i REST admina wylacznie z LAN-u/Tailscale. Publicznie zostaja tylko
+      # endpointy potrzebne do OAuth (/realms/*). Regula jest dluzsza niz keycloak-secure,
+      # wiec Traefik nadaje jej wyzszy priorytet automatycznie.
+      - "traefik.http.routers.keycloak-admin.entrypoints=https"
+      - "traefik.http.routers.keycloak-admin.rule=Host(`keycloak.lagowska46.ovh`) && PathPrefix(`/admin`)"
+      - "traefik.http.routers.keycloak-admin.middlewares=lan-only@file"
+      - "traefik.http.routers.keycloak-admin.tls=true"
+      - "traefik.http.routers.keycloak-admin.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.keycloak-admin.service=keycloak"
       # Service
       - "traefik.http.routers.keycloak-secure.service=keycloak"
       - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
