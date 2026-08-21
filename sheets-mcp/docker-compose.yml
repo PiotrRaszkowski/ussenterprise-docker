@@ -1,0 +1,59 @@
+services:
+  sheets-mcp:
+    # Proxy FastMCP 3 z OAuth (realm mcpservers) przed mcp-google-sheets, ktory sam
+    # uwierzytelniania nie ma. Szczegoly i uzasadnienie w README.md.
+    build: .
+    image: sheets-mcp:2026-08-19
+    container_name: sheets-mcp
+    restart: unless-stopped
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - traefik-proxy
+    # Celowo bez `ports:` — dostep wylacznie przez siec traefik-proxy.
+    volumes:
+      - ./service-account.json:/creds/service-account.json:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      - HOME=/tmp
+      - TZ=Europe/Warsaw
+      # OAuth — ten sam realm co garmin-mcp; Claude rejestruje sie przez DCR,
+      # wiec w connectorze pola client ID i secret zostaja PUSTE.
+      - SHEETS_MCP_AUTH_REALM_URL=https://keycloak.lagowska46.ovh/realms/mcpservers
+      - SHEETS_MCP_AUTH_BASE_URL=https://sheets-mcp.lagowska46.ovh
+      # Dostep do Google przez konto serwisowe. Widzi wylacznie to, co udostepnisz
+      # jego adresowi na Dysku — to jest granica promienia razenia.
+      - SERVICE_ACCOUNT_PATH=/creds/service-account.json
+      - DRIVE_FOLDER_ID=${DRIVE_FOLDER_ID}
+      # Wszystkie narzedzia oprocz share_spreadsheet: nadawanie uprawnien jest jedyna
+      # operacja, ktora wypuszcza dane poza Twoj folder.
+      - ENABLED_TOOLS=add_chart,add_columns,add_rows,batch_update,batch_update_cells,copy_sheet,create_sheet,create_spreadsheet,find_in_spreadsheet,get_multiple_sheet_data,get_multiple_spreadsheet_summary,get_sheet_data,get_sheet_formulas,list_folders,list_sheets,list_spreadsheets,rename_sheet,search_spreadsheets,update_cells
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "traefik.enable=true"
+      # HTTP -> HTTPS redirect. Bez allowlisty — tedy idzie wyzwanie ACME HTTP-01.
+      - "traefik.http.routers.sheets-mcp.entrypoints=http"
+      - "traefik.http.routers.sheets-mcp.rule=Host(`sheets-mcp.lagowska46.ovh`)"
+      - "traefik.http.middlewares.sheets-mcp-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.sheets-mcp.middlewares=sheets-mcp-https-redirect"
+      # HTTPS. Dwie warstwy: OAuth (serwer sam zwraca 401) oraz allowlista IP Anthropica.
+      - "traefik.http.routers.sheets-mcp-secure.entrypoints=https"
+      - "traefik.http.routers.sheets-mcp-secure.rule=Host(`sheets-mcp.lagowska46.ovh`)"
+      - "traefik.http.routers.sheets-mcp-secure.middlewares=anthropic-only@file"
+      - "traefik.http.routers.sheets-mcp-secure.tls=true"
+      - "traefik.http.routers.sheets-mcp-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sheets-mcp-secure.service=sheets-mcp"
+      # Service
+      - "traefik.http.services.sheets-mcp.loadbalancer.server.port=8000"
+      - "traefik.docker.network=traefik-proxy"
+
+networks:
+  traefik-proxy:
+    name: traefik-proxy
+    external: true

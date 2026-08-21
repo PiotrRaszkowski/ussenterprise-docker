@@ -1,0 +1,53 @@
+services:
+  mail-mcp:
+    # Proxy FastMCP 3 (OAuth/Keycloak) przed better-email-mcp (IMAP do Gmaila i iCloud).
+    # Szczegóły i uzasadnienie w Dockerfile i serve.py.
+    build: .
+    image: mail-mcp:2026-08-20
+    container_name: mail-mcp
+    restart: unless-stopped
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    networks:
+      - traefik-proxy
+    # Celowo bez `ports:` — dostęp wyłącznie przez sieć traefik-proxy.
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      - HOME=/tmp
+      - TZ=Europe/Warsaw
+      # OAuth — ten sam realm co pozostałe MCP; Claude rejestruje się przez DCR,
+      # więc w connectorze pola client ID i secret zostają PUSTE.
+      - MAIL_MCP_AUTH_REALM_URL=https://keycloak.lagowska46.ovh/realms/mcpservers
+      - MAIL_MCP_AUTH_BASE_URL=https://mail-mcp.lagowska46.ovh
+      # App-specific passwords do skrzynek — z .env (poza gitem).
+      - EMAIL_CREDENTIALS=${EMAIL_CREDENTIALS}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mail-mcp.entrypoints=http"
+      - "traefik.http.routers.mail-mcp.rule=Host(`mail-mcp.lagowska46.ovh`)"
+      - "traefik.http.middlewares.mail-mcp-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.mail-mcp.middlewares=mail-mcp-https-redirect"
+      - "traefik.http.routers.mail-mcp-secure.entrypoints=https"
+      - "traefik.http.routers.mail-mcp-secure.rule=Host(`mail-mcp.lagowska46.ovh`)"
+      - "traefik.http.routers.mail-mcp-secure.middlewares=anthropic-only@file"
+      - "traefik.http.routers.mail-mcp-secure.tls=true"
+      - "traefik.http.routers.mail-mcp-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.mail-mcp-secure.service=mail-mcp"
+      - "traefik.http.services.mail-mcp.loadbalancer.server.port=8000"
+      - "traefik.docker.network=traefik-proxy"
+
+networks:
+  traefik-proxy:
+    name: traefik-proxy
+    external: true

@@ -1,0 +1,73 @@
+services:
+  baselinker-mcp:
+    # Serwer MCP do BaseLinkera, budowany wprost z gita i pinowany na tag.
+    # Aktualizacja: nowy tag w repo, podmiana refa ponizej i tagu w `image:`,
+    # potem `docker compose build --no-cache && docker compose up -d`.
+    build:
+      context: https://github.com/PiotrRaszkowski/baselinker-mcp.git#v0.2.0
+    image: baselinker-mcp:0.2.0
+    container_name: baselinker-mcp
+    restart: unless-stopped
+    command: ["--transport", "http", "--host", "0.0.0.0", "--port", "8000", "--path", "/mcp"]
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    networks:
+      - traefik-proxy
+    # Celowo bez `ports:` — dostep wylacznie przez siec traefik-proxy.
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      - HOME=/tmp
+      - TZ=Europe/Warsaw
+      # Token API BaseLinkera — jeden, wspolny. Kazdy zalogowany uzytkownik realmu
+      # dziala na tym samym koncie BaseLinker. Trzymany w .env obok tego pliku.
+      - BASELINKER_API_TOKEN=${BASELINKER_API_TOKEN}
+      # Pelne 179 metod, wlacznie z zapisami: modyfikacja zamowien, produktow, stanow
+      # magazynowych, faktur i przesylek kurierskich. To jest promien razenia tego
+      # endpointu — dlatego OAuth ponizej nie jest opcjonalny.
+      - BASELINKER_ALLOW_WRITES=true
+      # OAuth — ten sam realm co garmin-mcp i sheets-mcp. Claude rejestruje sie sam
+      # przez DCR, wiec w connectorze pola client ID i secret zostaja PUSTE.
+      - BASELINKER_MCP_AUTH_REALM_URL=https://keycloak.lagowska46.ovh/realms/mcpservers
+      - BASELINKER_MCP_AUTH_BASE_URL=https://baselinker-mcp.lagowska46.ovh
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "traefik.enable=true"
+      # HTTP -> HTTPS redirect. Bez allowlisty — tedy idzie wyzwanie ACME HTTP-01.
+      - "traefik.http.routers.baselinker-mcp.entrypoints=http"
+      - "traefik.http.routers.baselinker-mcp.rule=Host(`baselinker-mcp.lagowska46.ovh`)"
+      - "traefik.http.middlewares.baselinker-mcp-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.baselinker-mcp.middlewares=baselinker-mcp-https-redirect"
+      # HTTPS. Dwie warstwy: OAuth (serwer sam zwraca 401 + WWW-Authenticate) oraz
+      # allowlista IP Anthropica. Sama allowlista nie wystarcza — zakres 160.79.104.0/21
+      # jest wspoldzielony przez cala infrastrukture Anthropica, a nazwa hosta jest
+      # publiczna w logach Certificate Transparency.
+      - "traefik.http.routers.baselinker-mcp-secure.entrypoints=https"
+      - "traefik.http.routers.baselinker-mcp-secure.rule=Host(`baselinker-mcp.lagowska46.ovh`)"
+      - "traefik.http.routers.baselinker-mcp-secure.middlewares=anthropic-only@file"
+      - "traefik.http.routers.baselinker-mcp-secure.tls=true"
+      - "traefik.http.routers.baselinker-mcp-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.baselinker-mcp-secure.service=baselinker-mcp"
+      # Service
+      - "traefik.http.services.baselinker-mcp.loadbalancer.server.port=8000"
+      - "traefik.docker.network=traefik-proxy"
+
+networks:
+  traefik-proxy:
+    name: traefik-proxy
+    external: true

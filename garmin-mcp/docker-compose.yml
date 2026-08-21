@@ -1,0 +1,69 @@
+services:
+  garmin-mcp:
+    # Fork eddmann/garmin-connect-mcp z dołożonym transportem HTTP (upstream ma tylko
+    # stdio) i narzędziem update_activity. Budowany wprost z gita, pinowany na tag.
+    # Aktualizacja: w /home/piotr/src/garmin-connect-mcp `git pull upstream main`,
+    # nowy tag, podmiana refa poniżej, `docker compose build --no-cache && up -d`.
+    # Robi się to, gdy Garmin zacznie odrzucać logowanie (401/403) — cała odporność
+    # na zmiany po ich stronie siedzi w bibliotece garminconnect.
+    build:
+      context: https://github.com/PiotrRaszkowski/garmin-connect-mcp.git#homelab-2026-08-19e
+    image: garmin-mcp:homelab-2026-08-19e
+    container_name: garmin-mcp
+    restart: unless-stopped
+    # Serwer nasłuchuje pod sekretną ścieżką — patrz .env i README (sekcja o bezpieczeństwie).
+    command: ["--transport", "http", "--host", "0.0.0.0", "--port", "8000", "--path", "/mcp"]
+    # Tokeny są odświeżane w locie; mają zostać własnością piotra, żeby kolejny
+    # scp z Maca nie wywalał się na uprawnieniach.
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - traefik-proxy
+    # Celowo bez `ports:` — usługa jest osiągalna wyłącznie przez sieć traefik-proxy.
+    volumes:
+      - ./tokens:/tokens       # rw — biblioteka zapisuje odświeżony token OAuth2
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      - GARMINTOKENS=/tokens
+      - HOME=/tmp
+      - TZ=Europe/Warsaw
+      # OAuth przez wlasnego Keycloaka (realm mcpservers). Claude rejestruje sie
+      # sam przez Dynamic Client Registration, wiec w connectorze nie podaje sie
+      # client ID ani secretu.
+      - GARMIN_MCP_AUTH_PROVIDER=keycloak
+      - GARMIN_MCP_AUTH_REALM_URL=https://keycloak.lagowska46.ovh/realms/mcpservers
+      - GARMIN_MCP_AUTH_BASE_URL=https://garmin-mcp.lagowska46.ovh
+      # GARMIN_EMAIL i GARMIN_PASSWORD celowo NIEUSTAWIONE.
+      # Logowanie do Garmina odbywa się wyłącznie na Macu (wymaga MFA), a tokeny
+      # przenosi się tu przez scp. Patrz README.md.
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "traefik.enable=true"
+      # HTTP -> HTTPS redirect. Bez allowlisty — tędy idzie wyzwanie ACME HTTP-01.
+      - "traefik.http.routers.garmin-mcp.entrypoints=http"
+      - "traefik.http.routers.garmin-mcp.rule=Host(`garmin-mcp.lagowska46.ovh`)"
+      - "traefik.http.middlewares.garmin-mcp-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.garmin-mcp.middlewares=garmin-mcp-https-redirect"
+      # Sama allowlista nie wystarcza — zakres 160.79.104.0/21 jest współdzielony przez
+      # całą infrastrukturę Anthropica, a nazwa hosta jest publiczna w logach
+      # Certificate Transparency, więc każdy mógłby dodać ten endpoint jako swój connector.
+      - "traefik.http.routers.garmin-mcp-secure.entrypoints=https"
+      - "traefik.http.routers.garmin-mcp-secure.rule=Host(`garmin-mcp.lagowska46.ovh`)"
+      - "traefik.http.routers.garmin-mcp-secure.middlewares=anthropic-only@file"
+      - "traefik.http.routers.garmin-mcp-secure.tls=true"
+      - "traefik.http.routers.garmin-mcp-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.garmin-mcp-secure.service=garmin-mcp"
+      # Service
+      - "traefik.http.services.garmin-mcp.loadbalancer.server.port=8000"
+      - "traefik.docker.network=traefik-proxy"
+
+networks:
+  traefik-proxy:
+    name: traefik-proxy
+    external: true
